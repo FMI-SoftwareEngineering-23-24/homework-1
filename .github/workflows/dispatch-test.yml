@@ -1,0 +1,47 @@
+name: Run Automatic Tests
+
+on:
+  repository_dispatch:
+    types: [run-tests]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: self-hosted
+    env:
+      TESTS_REPO_URL: https://github.com/FMI-SoftwareEngineering-23-24/tests-homework-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare
+        run: |
+          git config --global user.name "Automatic Tests"
+          git config --global user.email "automatic-tests@dev.null"
+
+          rm -rf test-results
+
+      - name: Make temporary directory for tests
+        id: temp
+        run: echo "path=$(mktemp -d)" >> $GITHUB_OUTPUT
+
+      - name: Download tests
+        run: |
+          git clone "$TESTS_REPO_URL" "${{ steps.temp.outputs.path }}"
+          chmod +x ${{ steps.temp.outputs.path }}/tests.sh
+
+      - name: Run tests
+        run: ${{ steps.temp.outputs.path }}/tests.sh
+
+      - name: Upload results
+        if: success() || failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: results
+          path: test-results/
+
+      - name: Push results
+        if: success() || failure()
+        run: |
+          git add test-results
+          git commit -m "Add results from automatic tests"
+          git push origin main
